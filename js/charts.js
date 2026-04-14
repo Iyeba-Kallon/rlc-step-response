@@ -1,15 +1,24 @@
-// Chart.js setup and logic
-
+/**
+ * Charting System: charts.js
+ * 
+ * Manages the initialization, theme tracking, and high-performance repainting 
+ * of the 3 Chart.js canvas elements displaying Voltage, Current, and Energy.
+ */
 const ChartManager = {
-    vChart: null,
-    iChart: null,
-    eChart: null,
+    // References to the active Chart.js instances
+    voltageChart: null,
+    currentChart: null,
+    energyChart: null,
 
+    /**
+     * Constructor: Mounts the charts into the DOM with default settings.
+     */
     init: function() {
+        // Repeated styling definitions to ensure everything looks premium & clean
         const commonOptions = {
             responsive: true,
             maintainAspectRatio: false,
-            animation: false,
+            animation: false, // Turned off for fluid, real-time interactivity when sliding
             interaction: {
                 mode: 'index',
                 intersect: false,
@@ -33,15 +42,16 @@ const ChartManager = {
             }
         };
 
+        // 1. Voltage Chart Setup
         const ctxV = document.getElementById('chart-voltage').getContext('2d');
-        this.vChart = new Chart(ctxV, {
+        this.voltageChart = new Chart(ctxV, {
             type: 'line',
             data: {
                 datasets: [{
                     label: 'Voltage (V)',
-                    borderColor: '#ef4444',
+                    borderColor: '#ef4444', // Tailwind Red-500
                     borderWidth: 2,
-                    pointRadius: 0,
+                    pointRadius: 0,         // Hide individual data points for pure sweeping line
                     data: []
                 }]
             },
@@ -54,13 +64,14 @@ const ChartManager = {
             }
         });
 
+        // 2. Current Chart Setup
         const ctxI = document.getElementById('chart-current').getContext('2d');
-        this.iChart = new Chart(ctxI, {
+        this.currentChart = new Chart(ctxI, {
             type: 'line',
             data: {
                 datasets: [{
                     label: 'Current (A)',
-                    borderColor: '#3b82f6',
+                    borderColor: '#3b82f6', // Tailwind Blue-500
                     borderWidth: 2,
                     pointRadius: 0,
                     data: []
@@ -75,21 +86,22 @@ const ChartManager = {
             }
         });
 
+        // 3. Energy Component Chart Setup
         const ctxE = document.getElementById('chart-energy').getContext('2d');
-        this.eChart = new Chart(ctxE, {
+        this.energyChart = new Chart(ctxE, {
             type: 'line',
             data: {
                 datasets: [
                     {
                         label: 'Energy in Inductor (J)',
-                        borderColor: '#10b981',
+                        borderColor: '#10b981', // Tailwind Emerald-500
                         borderWidth: 2,
                         pointRadius: 0,
                         data: []
                     },
                     {
                         label: 'Energy in Capacitor (J)',
-                        borderColor: '#f59e0b',
+                        borderColor: '#f59e0b', // Tailwind Amber-500
                         borderWidth: 2,
                         pointRadius: 0,
                         data: []
@@ -106,13 +118,21 @@ const ChartManager = {
         });
     },
 
+    /**
+     * Re-acquires current CSS custom properties and pushes them into Chart.js elements.
+     * Allows seamless hot-switching between Light & Dark modes without refreshing.
+     */
     updateThemeColors: function() {
         const textColor = getComputedStyle(document.documentElement).getPropertyValue('--text-main').trim();
         const mutedColor = getComputedStyle(document.documentElement).getPropertyValue('--text-muted').trim() || '#94a3b8';
         const gridColor = 'rgba(148, 163, 184, 0.1)';
 
-        [this.vChart, this.iChart, this.eChart].forEach(chart => {
-            if(!chart) return;
+        const charts = [this.voltageChart, this.currentChart, this.energyChart];
+        
+        charts.forEach(chart => {
+            if (!chart) return;
+            
+            // Re-apply theme colors to dynamically generated canvas elements
             chart.options.plugins.legend.labels.color = textColor;
             chart.options.scales.x.title.color = mutedColor;
             chart.options.scales.x.ticks.color = mutedColor;
@@ -120,14 +140,26 @@ const ChartManager = {
             chart.options.scales.y.title.color = mutedColor;
             chart.options.scales.y.ticks.color = mutedColor;
             chart.options.scales.y.grid.color = gridColor;
+            
+            // Request minimal repaint
             chart.update('none');
         });
     },
 
+    /**
+     * Blasts new array matrices into the three canvases.
+     * Bypasses heavy API recalculations by injecting the array directly.
+     * 
+     * @param {Array} t - Time instances
+     * @param {Array} v - Main Voltage array 
+     * @param {Array} i - Main Current array
+     * @param {Array} el - Inductive Energy array
+     * @param {Array} ec - Capacitive Energy array
+     */
     update: function(t, v, i, el, ec) {
-        if (!this.vChart) return;
+        if (!this.voltageChart) return;
         
-        // format data for chart.js [{x, y}]
+        // Convert to Chart.js coordinate objects {x, y}
         const vData = new Array(t.length);
         const iData = new Array(t.length);
         const elData = new Array(t.length);
@@ -140,14 +172,15 @@ const ChartManager = {
             ecData[j] = { x: t[j], y: ec[j] };
         }
 
-        this.vChart.data.datasets[0].data = vData;
-        this.vChart.update('none');
+        // Apply new data arrays and initiate waitless paint 
+        this.voltageChart.data.datasets[0].data = vData;
+        this.voltageChart.update('none');
 
-        this.iChart.data.datasets[0].data = iData;
-        this.iChart.update('none');
+        this.currentChart.data.datasets[0].data = iData;
+        this.currentChart.update('none');
 
-        this.eChart.data.datasets[0].data = elData;
-        this.eChart.data.datasets[1].data = ecData;
-        this.eChart.update('none');
+        this.energyChart.data.datasets[0].data = elData;
+        this.energyChart.data.datasets[1].data = ecData;
+        this.energyChart.update('none');
     }
 };
