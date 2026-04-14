@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RLC Step Response Simulator</title>
+    <link rel="stylesheet" href="styles/main.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+    <script src="js/rlc.js" defer></script>
+    <script src="js/charts.js" defer></script>
+    <script src="js/ui.js" defer></script>
+    <script src="js/main.js" defer></script>
+</head>
+<body>
+    <div class="app-container">
+        <aside class="sidebar">
+            <header>
+                <h1>RLC Simulator</h1>
+                <p>Interactive Step Response</p>
+            </header>
+
+            <div class="topology-toggle">
+                <button id="btn-series" class="active">Series</button>
+                <button id="btn-parallel">Parallel</button>
+            </div>
+
+            <div class="controls">
+                <div class="control-group">
+                    <label for="val-r">Resistance (R): <span><span id="label-r">50</span> Ω</span></label>
+                    <input type="range" id="val-r" min="1" max="1000" step="1" value="50">
+                </div>
+                <div class="control-group">
+                    <label for="val-l">Inductance (L): <span><span id="label-l">100</span> mH</span></label>
+                    <input type="range" id="val-l" min="1" max="1000" step="1" value="100">
+                </div>
+                <div class="control-group">
+                    <label for="val-c">Capacitance (C): <span><span id="label-c">100</span> µF</span></label>
+                    <input type="range" id="val-c" min="1" max="1000" step="1" value="100">
+                </div>
+                <div class="control-group">
+                    <label for="val-vin">Amplitude (<span id="amp-sym">Vin</span>): <span><span id="label-vin">5</span> <span id="amp-unit">V</span></span></label>
+                    <input type="range" id="val-vin" min="1" max="24" step="0.1" value="5">
+                </div>
+            </div>
+
+            <div class="info-panel">
+                <div class="info-item">
+                    <span>ζ (Damping Ratio):</span>
+                    <strong id="out-zeta">0.00</strong>
+                </div>
+                <div class="info-item">
+                    <span>ωₙ (Natural Freq):</span>
+                    <strong id="out-wn">0.00 <small>rad/s</small></strong>
+                </div>
+                <div class="info-item">
+                    <span>ωd (Damped Freq):</span>
+                    <strong id="out-wd">0.00 <small>rad/s</small></strong>
+                </div>
+                <div class="badge" id="out-condition">Underdamped</div>
+            </div>
+        </aside>
+
+        <main class="charts-container">
+            <div class="chart-wrapper">
+                <canvas id="chart-voltage"></canvas>
+            </div>
+            <div class="chart-wrapper">
+                <canvas id="chart-current"></canvas>
+            </div>
+            <div class="chart-wrapper">
+                <canvas id="chart-energy"></canvas>
+            </div>
+        </main>
+    </div>
+</body>
+</html>
