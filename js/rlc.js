@@ -1,20 +1,35 @@
-// Physics, math, ODE solver
-
+/**
+ * Physics and Mathematics Engine: rlc.js
+ * 
+ * This module is responsible for solving the second-order differential equations
+ * that govern Series and Parallel RLC circuits. We use the Runge-Kutta 4th Order (RK4)
+ * numerical integration method to simulate the step response over time.
+ */
 const RLC = {
-    // RK4 Solver for second order system
-    // dy/dt = f(t, y) where y is a vector [y1, y2]
+    /**
+     * Solves a system of ordinary differential equations (ODEs) using the RK4 method.
+     * 
+     * @param {Function} f - The derivative function returning [dy1/dt, dy2/dt].
+     * @param {Array} y0 - Initial state values [y1(0), y2(0)].
+     * @param {Number} t0 - Start time (seconds).
+     * @param {Number} tEnd - End time (seconds).
+     * @param {Number} steps - Number of discrete calculation steps.
+     * @returns {Object} Arrays containing the timeline 't', and state variables 'y1' and 'y2'.
+     */
     solveRK4: function(f, y0, t0, tEnd, steps) {
-        const h = (tEnd - t0) / steps;
+        const h = (tEnd - t0) / steps; // Time step size (dt)
         const result = { t: [], y1: [], y2: [] };
         
         let t = t0;
         let y = [...y0];
         
         for (let i = 0; i <= steps; i++) {
+            // Record current state before calculating the next step
             result.t.push(t);
             result.y1.push(y[0]);
             result.y2.push(y[1]);
             
+            // RK4 calculations: evaluating slopes at 4 different points across the time step
             const k1 = f(t, y);
             
             const y_k2 = [y[0] + 0.5 * h * k1[0], y[1] + 0.5 * h * k1[1]];
@@ -26,93 +41,147 @@ const RLC = {
             const y_k4 = [y[0] + h * k3[0], y[1] + h * k3[1]];
             const k4 = f(t + h, y_k4);
             
+            // Calculate next state by computing the weighted average of the slopes
             y[0] += (h / 6) * (k1[0] + 2 * k2[0] + 2 * k3[0] + k4[0]);
             y[1] += (h / 6) * (k1[1] + 2 * k2[1] + 2 * k3[1] + k4[1]);
+            
+            // Move time forward
             t += h;
         }
         
         return result;
     },
 
+    /**
+     * Simulates a Series RLC Circuit responding to a voltage step input.
+     * 
+     * @param {Number} R - Resistance in Ohms (Ω)
+     * @param {Number} L - Inductance in Henrys (H)
+     * @param {Number} C - Capacitance in Farads (F)
+     * @param {Number} Vin - Input Step Voltage (V)
+     */
     simulateSeries: function(R, L, C, Vin) {
-        // wn = 1 / sqrt(LC)
+        // Natural frequency (ωn)
         const wn = 1 / Math.sqrt(L * C);
-        // zeta = (R / 2) * sqrt(C / L)
+        
+        // Damping ratio (ζ)
         const zeta = (R / 2) * Math.sqrt(C / L);
         
-        // wd = wn * sqrt(1 - zeta^2) if underdamped
+        // Damped natural frequency (ωd) - only applies if the system is underdamped
         const wd = zeta < 1 ? wn * Math.sqrt(1 - zeta * zeta) : 0;
         
+        // Characteristic time constant (τ)
         const tau = 2 * L / R;
-        const tEnd = 5 * tau;
+        const totalSimTime = 5 * tau; // Simulate until near-steady state
         
-        // Initial conditions: Vc(0) = 0, i(0) = 0
-        // y[0] = Vc, y[1] = i
-        const f = (t, y) => {
-            const dVc_dt = y[1] / C;
-            const di_dt = (Vin - R * y[1] - y[0]) / L;
+        /** 
+         * Differential equation for Series RLC:
+         * We track: y[0] = Capacitor Voltage (Vc), y[1] = Circuit Current (i)
+         * 
+         * - Current through a capacitor: i = C * dVc/dt 
+         *   => dVc/dt = i / C
+         * - Voltage loop (KVL): Vin = L * di/dt + R * i + Vc 
+         *   => di/dt = (Vin - R * i - Vc) / L
+         */
+        const circuitODEs = (t, y) => {
+            const current = y[1];
+            const capacitorVoltage = y[0];
+            
+            const dVc_dt = current / C;
+            const di_dt = (Vin - (R * current) - capacitorVoltage) / L;
+            
             return [dVc_dt, di_dt];
         };
         
-        const sol = this.solveRK4(f, [0, 0], 0, tEnd, 1000);
+        // Initial conditions: Capacitor is completely discharged (0V), and no current is flowing (0A)
+        const initialState = [0, 0];
         
-        // Calculate Energy
-        const el = sol.y2.map(i => 0.5 * L * i * i); // 0.5 * L * i^2
-        const ec = sol.y1.map(v => 0.5 * C * v * v); // 0.5 * C * v_c^2
+        // Run execution (1000 data points for smooth charting)
+        const simulation = this.solveRK4(circuitODEs, initialState, 0, totalSimTime, 1000);
+        
+        // Calculate Energy Stored in the Components
+        const energyInductor = simulation.y2.map(i => 0.5 * L * (i * i)); // E_L = 1/2 L i^2
+        const energyCapacitor = simulation.y1.map(v => 0.5 * C * (v * v)); // E_C = 1/2 C v^2
         
         return {
-            t: sol.t.map(t => t * 1000), // convert to ms
-            v: sol.y1,  // capacitor voltage
-            i: sol.y2,  // circuit current
-            el: el,
-            ec: ec,
+            t: simulation.t.map(sec => sec * 1000), // Convert output time to ms for display
+            v: simulation.y1,  // Capacitor Voltage
+            i: simulation.y2,  // Loop Current
+            el: energyInductor,
+            ec: energyCapacitor,
             params: { wn, zeta, wd }
         };
     },
 
+    /**
+     * Simulates a Parallel RLC Circuit responding to a current step input.
+     * 
+     * @param {Number} R - Resistance in Ohms (Ω)
+     * @param {Number} L - Inductance in Henrys (H)
+     * @param {Number} C - Capacitance in Farads (F)
+     * @param {Number} Iin - Input Step Current (A)
+     */
     simulateParallel: function(R, L, C, Iin) {
-        // For parallel RLC
+        // Natural frequency (ωn)
         const wn = 1 / Math.sqrt(L * C);
-        // zeta = 1 / (2R * sqrt(C/L)) = 1 / (2 * R * C * wn)
-        const zeta = 1 / (2 * R * C * wn);
         
+        // Damping ratio (ζ) - Note the different formula compared to Series RLC
+        const zeta = 1 / (2 * R * Math.sqrt(C / L));
+        
+        // Damped natural frequency (ωd)
         const wd = zeta < 1 ? wn * Math.sqrt(1 - zeta * zeta) : 0;
         
+        // Time constant (τ) - Also different for parallel
         const tau = 2 * R * C;
-        // In parallel, if R is very large, tau can be huge, limit it for practical viewing
-        const effectiveTau = Math.min(tau, 10 / wn); 
-        const tEnd = 5 * effectiveTau;
         
-        // Initial conditions: IL(0) = 0, V(0) = 0
-        // y[0] = iL, y[1] = V
-        const f = (t, y) => {
-            const diL_dt = y[1] / L;
-            const dV_dt = (Iin - y[1] / R - y[0]) / C;
+        // Cap the total sim time so an absurdly large parallel resistance doesn't break the RK4 steps
+        const effectiveTau = Math.min(tau, 10 / wn); 
+        const totalSimTime = 5 * effectiveTau;
+        
+        /** 
+         * Differential equation for Parallel RLC:
+         * We track: y[0] = Inductor Current (iL), y[1] = Node Voltage (V)
+         * 
+         * - General KCL Equation: Iin = C*dV/dt + V/R + iL
+         *   => dV/dt = (Iin - V/R - iL) / C
+         * - Voltage across inductor: V = L * diL/dt
+         *   => diL/dt = V / L
+         */
+        const circuitODEs = (t, y) => {
+            const inductorCurrent = y[0];
+            const systemVoltage = y[1];
+            
+            const diL_dt = systemVoltage / L;
+            const dV_dt = (Iin - (systemVoltage / R) - inductorCurrent) / C;
+            
             return [diL_dt, dV_dt];
         };
         
-        const sol = this.solveRK4(f, [0, 0], 0, tEnd, 1000);
+        // Initial conditions: Inductor acts as open (0A), capacitor acts as short (0V)
+        const initialState = [0, 0];
         
-        // Calculate Energy
-        const el = sol.y0 ? sol.y0.map(il => 0.5 * L * il * il) : sol.y1.map(il => 0.5 * L * il * il); // oops, y[0] is y1 in sol
-        const _el = sol.y1.map(il => 0.5 * L * il * il); 
-        const _ec = sol.y2.map(v => 0.5 * C * v * v);
+        const simulation = this.solveRK4(circuitODEs, initialState, 0, totalSimTime, 1000);
+        
+        // Calculate Stored Energy
+        const energyInductor = simulation.y1.map(iL => 0.5 * L * (iL * iL)); 
+        const energyCapacitor = simulation.y2.map(v => 0.5 * C * (v * v));
         
         return {
-            t: sol.t.map(t => t * 1000), // convert to ms
-            v: sol.y2,  // circuit voltage
-            i: sol.y2.map(v => v/R + Iin),  // Wait, Iin is step source. Total current from source is Iin. Current through cap iC = C dv/dt.
-            // The prompt says "Circuit current i(t) - single line". 
-            // In parallel, maybe they mean the total current (Iin), or inductor current (iL).
-            // Let's provide I_L for current, as it's the dual to V_C.
-            // Wait, "Circuit current i(t)" - I'll plot i_L and label it "Inductor Current".
-            iL: sol.y1, 
-            el: _el,
-            ec: _ec,
+            t: simulation.t.map(sec => sec * 1000), // Convert output time to ms
+            v: simulation.y2,  // Main Circuit Voltage
+            iL: simulation.y1, // Internal Inductor current
+            el: energyInductor,
+            ec: energyCapacitor,
             params: { wn, zeta, wd }
         };
     },
 
+    /**
+     * Determines the english classification for a given damping ratio.
+     * 
+     * @param {Number} zeta - The damping ratio
+     * @returns {String} Human-readable damping classification
+     */
     getDampingCondition: function(zeta) {
         if (Math.abs(zeta - 1) < 0.01) return "Critically Damped";
         if (zeta < 1) return "Underdamped";
