@@ -53,136 +53,131 @@ const RLC = {
     },
 
     /**
-     * Simulates a Series RLC Circuit responding to a voltage step input.
+     * Simulates a Series RLC Circuit.
      * 
-     * @param {Number} R - Resistance in Ohms (Ω)
-     * @param {Number} L - Inductance in Henrys (H)
-     * @param {Number} C - Capacitance in Farads (F)
-     * @param {Number} Vin - Input Step Voltage (V)
+     * @param {Number} R - Resistance (Ω)
+     * @param {Number} L - Inductance (H)
+     * @param {Number} C - Capacitance (F)
+     * @param {Number} Amp - Step amplitude or Sine peak (V)
+     * @param {Object} options - { isSine: boolean, freq: number }
      */
-    simulateSeries: function(R, L, C, Vin) {
-        // Natural frequency (ωn)
+    simulateSeries: function(R, L, C, Amp, options = { isSine: false, freq: 60 }) {
         const wn = 1 / Math.sqrt(L * C);
-        
-        // Damping ratio (ζ)
         const zeta = (R / 2) * Math.sqrt(C / L);
-        
-        // Damped natural frequency (ωd) - only applies if the system is underdamped
         const wd = zeta < 1 ? wn * Math.sqrt(1 - zeta * zeta) : 0;
         
-        // Characteristic time constant (τ)
-        const tau = 2 * L / R;
-        const totalSimTime = 5 * tau; // Simulate until near-steady state
+        // Time constant and simulation window
+        const tau = R > 0 ? 2 * L / R : 1 / wn; 
+        const totalSimTime = options.isSine ? Math.min(0.2, 10 / options.freq) : 5 * tau;
         
-        /** 
-         * Differential equation for Series RLC:
-         * We track: y[0] = Capacitor Voltage (Vc), y[1] = Circuit Current (i)
-         * 
-         * - Current through a capacitor: i = C * dVc/dt 
-         *   => dVc/dt = i / C
-         * - Voltage loop (KVL): Vin = L * di/dt + R * i + Vc 
-         *   => di/dt = (Vin - R * i - Vc) / L
-         */
-        const circuitODEs = (t, y) => {
-            const current = y[1];
-            const capacitorVoltage = y[0];
-            
-            const dVc_dt = current / C;
-            const di_dt = (Vin - (R * current) - capacitorVoltage) / L;
-            
+        const f = (t, y) => {
+            const vSource = options.isSine ? Amp * Math.sin(2 * Math.PI * options.freq * t) : Amp;
+            const dVc_dt = y[1] / C;
+            const di_dt = (vSource - (R * y[1]) - y[0]) / L;
             return [dVc_dt, di_dt];
         };
         
-        // Initial conditions: Capacitor is completely discharged (0V), and no current is flowing (0A)
-        const initialState = [0, 0];
-        
-        // Run execution (1000 data points for smooth charting)
-        const simulation = this.solveRK4(circuitODEs, initialState, 0, totalSimTime, 1000);
-        
-        // Calculate Energy Stored in the Components
-        const energyInductor = simulation.y2.map(i => 0.5 * L * (i * i)); // E_L = 1/2 L i^2
-        const energyCapacitor = simulation.y1.map(v => 0.5 * C * (v * v)); // E_C = 1/2 C v^2
+        const simulation = this.solveRK4(f, [0, 0], 0, totalSimTime, 1000);
+        const steadyState = options.isSine ? 0 : Amp;
+        const ts = options.isSine ? 0 : this.calculateSettlingTime(simulation.t, simulation.y1, steadyState);
         
         return {
-            t: simulation.t.map(sec => sec * 1000), // Convert output time to ms for display
-            v: simulation.y1,  // Capacitor Voltage
-            i: simulation.y2,  // Loop Current
-            el: energyInductor,
-            ec: energyCapacitor,
+            t: simulation.t.map(sec => sec * 1000),
+            v: simulation.y1,
+            i: simulation.y2,
+            el: simulation.y2.map(i => 0.5 * L * i * i),
+            ec: simulation.y1.map(v => 0.5 * C * v * v),
+            steadyState,
+            ts,
             params: { wn, zeta, wd }
         };
     },
 
     /**
-     * Simulates a Parallel RLC Circuit responding to a current step input.
+     * Simulates a Parallel RLC Circuit.
      * 
-     * @param {Number} R - Resistance in Ohms (Ω)
-     * @param {Number} L - Inductance in Henrys (H)
-     * @param {Number} C - Capacitance in Farads (F)
-     * @param {Number} Iin - Input Step Current (A)
+     * @param {Number} R - Resistance (Ω)
+     * @param {Number} L - Inductance (H)
+     * @param {Number} C - Capacitance (F)
+     * @param {Number} Amp - Step current or Sine peak (A)
+     * @param {Object} options - { isSine: boolean, freq: number }
      */
-    simulateParallel: function(R, L, C, Iin) {
-        // Natural frequency (ωn)
+    simulateParallel: function(R, L, C, Amp, options = { isSine: false, freq: 60 }) {
         const wn = 1 / Math.sqrt(L * C);
-        
-        // Damping ratio (ζ) - Note the different formula compared to Series RLC
-        const zeta = 1 / (2 * R * Math.sqrt(C / L));
-        
-        // Damped natural frequency (ωd)
+        // Corrected formula: 1 / (2R) * sqrt(L/C)
+        const zeta = R > 0 ? (1 / (2 * R)) * Math.sqrt(L / C) : Infinity;
         const wd = zeta < 1 ? wn * Math.sqrt(1 - zeta * zeta) : 0;
         
-        // Time constant (τ) - Also different for parallel
-        const tau = 2 * R * C;
-        
-        // Cap the total sim time so an absurdly large parallel resistance doesn't break the RK4 steps
+        const tau = R > 0 ? 2 * R * C : 1 / wn;
         const effectiveTau = Math.min(tau, 10 / wn); 
-        const totalSimTime = 5 * effectiveTau;
+        const totalSimTime = options.isSine ? Math.min(0.2, 10 / options.freq) : 5 * effectiveTau;
         
-        /** 
-         * Differential equation for Parallel RLC:
-         * We track: y[0] = Inductor Current (iL), y[1] = Node Voltage (V)
-         * 
-         * - General KCL Equation: Iin = C*dV/dt + V/R + iL
-         *   => dV/dt = (Iin - V/R - iL) / C
-         * - Voltage across inductor: V = L * diL/dt
-         *   => diL/dt = V / L
-         */
-        const circuitODEs = (t, y) => {
-            const inductorCurrent = y[0];
-            const systemVoltage = y[1];
-            
-            const diL_dt = systemVoltage / L;
-            const dV_dt = (Iin - (systemVoltage / R) - inductorCurrent) / C;
-            
+        const f = (t, y) => {
+            const iSource = options.isSine ? Amp * Math.sin(2 * Math.PI * options.freq * t) : Amp;
+            const diL_dt = y[1] / L;
+            const dV_dt = (iSource - (y[1] / (R || 1e-9)) - y[0]) / C;
             return [diL_dt, dV_dt];
         };
         
-        // Initial conditions: Inductor acts as open (0A), capacitor acts as short (0V)
-        const initialState = [0, 0];
-        
-        const simulation = this.solveRK4(circuitODEs, initialState, 0, totalSimTime, 1000);
-        
-        // Calculate Stored Energy
-        const energyInductor = simulation.y1.map(iL => 0.5 * L * (iL * iL)); 
-        const energyCapacitor = simulation.y2.map(v => 0.5 * C * (v * v));
+        const simulation = this.solveRK4(f, [0, 0], 0, totalSimTime, 1000);
+        const steadyState = options.isSine ? 0 : Amp * R;
+        const ts = options.isSine ? 0 : this.calculateSettlingTime(simulation.t, simulation.y2, steadyState);
         
         return {
-            t: simulation.t.map(sec => sec * 1000), // Convert output time to ms
-            v: simulation.y2,  // Main Circuit Voltage
-            iL: simulation.y1, // Internal Inductor current
-            el: energyInductor,
-            ec: energyCapacitor,
+            t: simulation.t.map(sec => sec * 1000),
+            v: simulation.y2,
+            iL: simulation.y1,
+            el: simulation.y1.map(iL => 0.5 * L * iL * iL),
+            ec: simulation.y2.map(v => 0.5 * C * v * v),
+            steadyState,
+            ts,
             params: { wn, zeta, wd }
         };
     },
 
     /**
-     * Determines the english classification for a given damping ratio.
-     * 
-     * @param {Number} zeta - The damping ratio
-     * @returns {String} Human-readable damping classification
+     * Calculates 2% settling time.
      */
+    calculateSettlingTime: function(t, data, target) {
+        if (target === 0 || isNaN(target)) return 0;
+        const tolerance = 0.02 * Math.abs(target);
+        
+        // Find the last index where the data is outside the tolerance band
+        let lastIndex = -1;
+        for (let i = data.length - 1; i >= 0; i--) {
+            if (Math.abs(data[i] - target) > tolerance) {
+                lastIndex = i;
+                break;
+            }
+        }
+        
+        return lastIndex === -1 ? 0 : t[lastIndex] * 1000;
+    },
+
+    /**
+     * General Frequency Response Magnitude: |H(jω)|
+     */
+    calculateFrequencyResponse: function(R, L, C, isSeries) {
+        const points = [];
+        const wn = 1 / Math.sqrt(L * C);
+        const zeta = isSeries ? (R / 2) * Math.sqrt(C / L) : (1 / (2 * R)) * Math.sqrt(L / C);
+        
+        // Logarithmic sweep from 0.1 * wn to 10 * wn
+        for (let i = 0; i <= 200; i++) {
+            const w = 0.1 * wn * Math.pow(100, i / 200);
+            const u = w / wn; // normalized frequency
+            
+            // For Series Vc/Vin or Parallel V/(Iin*R)
+            // H(s) = wn^2 / (s^2 + 2*zeta*wn*s + wn^2)
+            const magnitude = 1 / Math.sqrt(Math.pow(1 - u * u, 2) + Math.pow(2 * zeta * u, 2));
+            
+            points.push({ x: w / (2 * Math.PI), y: magnitude });
+        }
+        return points;
+    },
+
     getDampingCondition: function(zeta) {
+        if (zeta === Infinity) return "Undamped (Short)";
         if (Math.abs(zeta - 1) < 0.01) return "Critically Damped";
         if (zeta < 1) return "Underdamped";
         return "Overdamped";
