@@ -1,32 +1,29 @@
-# Interactive RLC Circuit Step Response Simulator
+A professional-grade, interactive web application for simulating Series and Parallel RLC circuits. Supports both transient step-response and steady-state AC frequency analysis.
 
-A beautiful, interactive web application that simulates the step response of Series and Parallel RLC circuits using Vanila JavaScript and Chart.js.
+## Features
 
-## How to Run
+- **RK4 Physics**: High-precision numerical integration for time-domain simulation.
+- **AC Mode**: Switch between Step and Sinusoidal excitation.
+- **Frequency Response**: Logarithmic Bode magnitude plots ($|H(j\omega)|$ vs $f$).
+- **Smart Markers**: Automatic 2% settling time identification and steady-state dashed lines.
+- **SVG Schematics**: Live-updating circuit diagrams.
+- **Report Ready**: One-click PNG export for all charts.
 
-There are no build tools or frameworks required! 
-
-Simply double-click the `index.html` file or open it directly in any modern web browser to run the simulation.
-
-## Overview
-
-The simulator uses **RK4 (Runge-Kutta 4th Order)** numerical integration to estimate the voltage, individual component currents, and stored energy in the system across 1000 sample periods dynamically recalculating live whenever the circuit values change.
+## Physics Reference
 
 ### Damping Conditions
-
-- **ζ (Zeta)**: The Damping Ratio.
-  - **Underdamped ($ζ < 1$)**: The system oscillates with gradually decreasing amplitude.
-  - **Critically Damped ($ζ = 1$)**: The system returns to steady state as fast as possible without oscillating.
-  - **Overdamped ($ζ > 1$)**: The system returns to steady state without oscillating, but slower than if it were critically damped.
+- **ζ < 1 (Underdamped)**: Oscillatory response.
+- **ζ = 1 (Critically Damped)**: Fastest non-oscillatory return to steady state.
+- **ζ > 1 (Overdamped)**: Sluggish non-oscillatory response.
 
 ### Formulas
 
-**Series RLC:**
-- $τ = 2L/R$
-- $ω_n = 1 / \sqrt{LC}$
-- $ζ = (R / 2) * \sqrt{C / L}$
+| Parameter | Series RLC | Parallel RLC |
+| :--- | :--- | :--- |
+| **Natural Freq (ωn)** | $1 / \sqrt{LC}$ | $1 / \sqrt{LC}$ |
+| **Damping Ratio (ζ)** | $(R / 2) \cdot \sqrt{C / L}$ | $1 / (2R) \cdot \sqrt{L / C}$ |
+| **Settling Time (ts)** | Time until stays within 2% | Time until stays within 2% |
 
-**Parallel RLC:**
-- $τ = 2RC$
-- $ω_n = 1 / \sqrt{LC}$
-- $ζ = 1 / (2R \sqrt{C/L})$
+## How to Run
+Simply open `index.html` in any modern web browser. 
+No build tools, servers, or installations required.
