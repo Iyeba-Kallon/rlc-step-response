@@ -2,7 +2,7 @@
  * Charting System: charts.js
  * 
  * Manages the initialization, theme tracking, and high-performance repainting 
- * of the 3 Chart.js canvas elements displaying Voltage, Current, and Energy.
+ * of the Chart.js elements with premium neon aesthetics.
  */
 const ChartManager = {
     voltageChart: null,
@@ -11,36 +11,74 @@ const ChartManager = {
     bodeChart: null,
 
     init: function() {
+        const style = getComputedStyle(document.documentElement);
+        const textColor = style.getPropertyValue('--text-main').trim();
+        const mutedColor = style.getPropertyValue('--text-muted').trim();
+        const gridColor = style.getPropertyValue('--border').trim();
+
         const commonOptions = {
             responsive: true,
             maintainAspectRatio: false,
-            animation: false,
+            animation: { duration: 400, easing: 'easeOutQuart' },
             interaction: { mode: 'index', intersect: false },
             plugins: {
-                legend: { labels: { color: '#f8fafc', font: { size: 10 } } }
+                legend: { 
+                    position: 'top',
+                    align: 'end',
+                    labels: { 
+                        color: textColor, 
+                        font: { family: 'Outfit', size: 11, weight: '500' },
+                        usePointStyle: true,
+                        pointStyle: 'circle',
+                        padding: 15
+                    } 
+                },
+                tooltip: {
+                    backgroundColor: 'rgba(15, 23, 42, 0.9)',
+                    titleFont: { family: 'Outfit' },
+                    bodyFont: { family: 'Inter' },
+                    padding: 10,
+                    borderColor: gridColor,
+                    borderWidth: 1,
+                    displayColors: true
+                }
             },
             scales: {
                 x: {
                     type: 'linear',
-                    title: { display: true, text: 'Time (ms)', color: '#94a3b8' },
-                    grid: { color: 'rgba(148, 163, 184, 0.1)' },
-                    ticks: { color: '#94a3b8' }
+                    title: { display: true, text: 'Time (ms)', color: mutedColor, font: { family: 'Outfit', weight: '600' } },
+                    grid: { color: gridColor, drawTicks: false },
+                    ticks: { color: mutedColor, font: { family: 'Inter', size: 10 }, padding: 8 }
                 },
                 y: {
-                    grid: { color: 'rgba(148, 163, 184, 0.1)' },
-                    ticks: { color: '#94a3b8' }
+                    grid: { color: gridColor, drawTicks: false },
+                    ticks: { color: mutedColor, font: { family: 'Inter', size: 10 }, padding: 8 }
                 }
             }
         };
+
+        // Helper to create gradient
+        const createGradient = (ctx, color) => {
+            const gradient = ctx.createLinearGradient(0, 0, 0, 400);
+            gradient.addColorStop(0, color.replace(')', ', 0.2)').replace('rgb', 'rgba'));
+            gradient.addColorStop(1, color.replace(')', ', 0)').replace('rgb', 'rgba'));
+            return gradient;
+        };
+
+        const vColor = style.getPropertyValue('--v-color').trim();
+        const iColor = style.getPropertyValue('--i-color').trim();
+        const e1Color = style.getPropertyValue('--e1-color').trim();
+        const e2Color = style.getPropertyValue('--e2-color').trim();
+        const bColor = style.getPropertyValue('--bode-color').trim();
 
         // Voltage Chart
         this.voltageChart = new Chart(document.getElementById('chart-voltage').getContext('2d'), {
             type: 'line',
             data: {
                 datasets: [
-                    { label: 'Voltage (V)', borderColor: '#ef4444', borderWidth: 2, pointRadius: 0, data: [] },
-                    { label: 'Steady State', borderColor: '#ef4444', borderWidth: 1, borderDash: [5, 5], pointRadius: 0, data: [] },
-                    { label: 'Settling Time', borderColor: '#94a3b8', borderWidth: 1, borderDash: [2, 2], pointRadius: 0, data: [] }
+                    { label: 'Voltage (V)', borderColor: vColor, backgroundColor: (ctx) => createGradient(ctx.chart.ctx, vColor), fill: true, borderWidth: 2.5, pointRadius: 0, tension: 0.1, data: [] },
+                    { label: 'Steady State', borderColor: vColor, borderWidth: 1, borderDash: [5, 5], pointRadius: 0, data: [] },
+                    { label: 'Settling Time', borderColor: mutedColor, borderWidth: 1, borderDash: [2, 2], pointRadius: 0, data: [] }
                 ]
             },
             options: commonOptions
@@ -51,8 +89,8 @@ const ChartManager = {
             type: 'line',
             data: {
                 datasets: [
-                    { label: 'Current (A)', borderColor: '#3b82f6', borderWidth: 2, pointRadius: 0, data: [] },
-                    { label: 'Settling Time', borderColor: '#94a3b8', borderWidth: 1, borderDash: [2, 2], pointRadius: 0, data: [] }
+                    { label: 'Current (A)', borderColor: iColor, backgroundColor: (ctx) => createGradient(ctx.chart.ctx, iColor), fill: true, borderWidth: 2.5, pointRadius: 0, tension: 0.1, data: [] },
+                    { label: 'Settling Time', borderColor: mutedColor, borderWidth: 1, borderDash: [2, 2], pointRadius: 0, data: [] }
                 ]
             },
             options: commonOptions
@@ -63,32 +101,32 @@ const ChartManager = {
             type: 'line',
             data: {
                 datasets: [
-                    { label: 'Energy L (J)', borderColor: '#10b981', borderWidth: 2, pointRadius: 0, data: [] },
-                    { label: 'Energy C (J)', borderColor: '#f59e0b', borderWidth: 2, pointRadius: 0, data: [] }
+                    { label: 'Energy L (J)', borderColor: e1Color, borderWidth: 2, pointRadius: 0, data: [] },
+                    { label: 'Energy C (J)', borderColor: e2Color, borderWidth: 2, pointRadius: 0, data: [] }
                 ]
             },
             options: commonOptions
         });
 
-        // Bode Chart (Frequency Response)
+        // Bode Chart
         this.bodeChart = new Chart(document.getElementById('chart-bode').getContext('2d'), {
             type: 'line',
             data: {
-                datasets: [{ label: 'Gain |H(jω)|', borderColor: '#8b5cf6', borderWidth: 2, pointRadius: 0, data: [] }]
+                datasets: [{ label: 'Gain |H(jω)|', borderColor: bColor, backgroundColor: (ctx) => createGradient(ctx.chart.ctx, bColor), fill: true, borderWidth: 3, pointRadius: 0, tension: 0.3, data: [] }]
             },
             options: {
                 ...commonOptions,
                 scales: {
                     x: {
                         type: 'logarithmic',
-                        title: { display: true, text: 'Frequency (Hz)', color: '#94a3b8' },
-                        grid: { color: 'rgba(148, 163, 184, 0.1)' },
-                        ticks: { color: '#94a3b8', callback: (val) => val >= 1 ? val : val.toFixed(1) }
+                        title: { display: true, text: 'Frequency (Hz)', color: mutedColor, font: { family: 'Outfit', weight: '600' } },
+                        grid: { color: gridColor },
+                        ticks: { color: mutedColor, font: { family: 'Inter', size: 10 }, callback: (val) => val >= 1 ? val : val.toFixed(1) }
                     },
                     y: {
-                        title: { display: true, text: 'Magnitude', color: '#94a3b8' },
-                        grid: { color: 'rgba(148, 163, 184, 0.1)' },
-                        ticks: { color: '#94a3b8' }
+                        title: { display: true, text: 'Magnitude', color: mutedColor, font: { family: 'Outfit', weight: '600' } },
+                        grid: { color: gridColor },
+                        ticks: { color: mutedColor, font: { family: 'Inter', size: 10 } }
                     }
                 }
             }
@@ -96,14 +134,18 @@ const ChartManager = {
     },
 
     updateThemeColors: function() {
-        const textColor = getComputedStyle(document.documentElement).getPropertyValue('--text-main').trim();
-        const mutedColor = getComputedStyle(document.documentElement).getPropertyValue('--text-muted').trim() || '#94a3b8';
+        const style = getComputedStyle(document.documentElement);
+        const textColor = style.getPropertyValue('--text-main').trim();
+        const mutedColor = style.getPropertyValue('--text-muted').trim();
+        const gridColor = style.getPropertyValue('--border').trim();
+
         [this.voltageChart, this.currentChart, this.energyChart, this.bodeChart].forEach(chart => {
             if (!chart) return;
             chart.options.plugins.legend.labels.color = textColor;
             chart.options.scales.x.title.color = mutedColor;
+            chart.options.scales.x.grid.color = gridColor;
             chart.options.scales.x.ticks.color = mutedColor;
-            chart.options.scales.y.title.color = mutedColor;
+            chart.options.scales.y.grid.color = gridColor;
             chart.options.scales.y.ticks.color = mutedColor;
             chart.update('none');
         });
@@ -113,18 +155,15 @@ const ChartManager = {
         const { t, v, i, el, ec, steadyState, ts } = res;
         const pts = (arr) => arr.map((val, idx) => ({ x: t[idx], y: val }));
 
-        // Voltage + Markers
         this.voltageChart.data.datasets[0].data = pts(v);
         this.voltageChart.data.datasets[1].data = steadyState !== 0 ? [{x: t[0], y: steadyState}, {x: t[t.length-1], y: steadyState}] : [];
-        this.voltageChart.data.datasets[2].data = (ts > 0) ? [{x: ts, y: 0}, {x: ts, y: Math.max(...v, steadyState)}] : [];
+        this.voltageChart.data.datasets[2].data = (ts > 0) ? [{x: ts, y: 0}, {x: ts, y: Math.max(...v, steadyState) * 1.1}] : [];
         this.voltageChart.update('none');
 
-        // Current + Markers
         this.currentChart.data.datasets[0].data = pts(i || res.iL);
-        this.currentChart.data.datasets[1].data = (ts > 0) ? [{x: ts, y: 0}, {x: ts, y: Math.max(...(i || res.iL))}] : [];
+        this.currentChart.data.datasets[1].data = (ts > 0) ? [{x: ts, y: 0}, {x: ts, y: Math.max(...(i || res.iL)) * 1.1}] : [];
         this.currentChart.update('none');
 
-        // Energy
         this.energyChart.data.datasets[0].data = pts(el);
         this.energyChart.data.datasets[1].data = pts(ec);
         this.energyChart.update('none');
