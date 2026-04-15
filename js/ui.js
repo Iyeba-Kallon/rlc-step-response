@@ -16,7 +16,9 @@ const UI = {
         // Tab switching
         const tabs = ['tab-time', 'tab-freq'];
         tabs.forEach(id => {
-            document.getElementById(id).addEventListener('click', () => {
+            const btn = document.getElementById(id);
+            if (!btn) return;
+            btn.addEventListener('click', () => {
                 this.currentTab = id.split('-')[1];
                 document.querySelectorAll('.tab-group button').forEach(b => b.classList.toggle('active', b.id === id));
                 document.querySelectorAll('.charts-container').forEach(c => c.classList.toggle('active', c.id === 'view-' + this.currentTab));
@@ -38,14 +40,28 @@ const UI = {
         sliders.forEach(id => {
             const el = document.getElementById(id);
             if (!el) return;
+
+            // Initialize fill percentage
+            this.updateSliderFill(el);
+
             el.addEventListener('input', (e) => {
+                const val = e.target.value;
                 const badgeId = 'label-' + id.split('-')[1];
-                document.getElementById(badgeId).innerText = e.target.value;
+                document.getElementById(badgeId).innerText = val;
+                this.updateSliderFill(e.target);
                 if (this.onChangeCallback) this.onChangeCallback();
             });
         });
 
         this.updateDiagram();
+    },
+
+    updateSliderFill: function(el) {
+        const min = el.min || 0;
+        const max = el.max || 100;
+        const val = el.value;
+        const percentage = (val - min) / (max - min) * 100;
+        el.style.backgroundSize = percentage + '% 100%';
     },
 
     setTopology: function(isSeries) {
@@ -71,21 +87,50 @@ const UI = {
 
     updateDiagram: function() {
         const container = document.getElementById('circuit-diagram');
-        // Simple SVG Schematics
-        const seriesSVG = `<svg viewBox="0 0 100 40" fill="none" stroke="currentColor" stroke-width="1.5">
-            <path d="M0 20 h10 m0 -5 v10 m5 -10 v10 m5 -5 h5 m0 -5 v10 l3 -10 l3 10 l3 -10 l3 10 v-5 h5 m0 -5 v2 h2 v-2 h2 v2 h2 v-2 h2 v2 m2 -2 h10" />
-            <circle cx="10" cy="20" r="1.5" /><circle cx="90" cy="20" r="1.5" />
-            <text x="15" y="10" font-size="5" fill="currentColor">V</text>
-            <text x="40" y="10" font-size="5" fill="currentColor">R</text>
-            <text x="60" y="10" font-size="5" fill="currentColor">L</text>
-            <text x="80" y="10" font-size="5" fill="currentColor">C</text>
+        // Elegant SVG Schematics with clean lines
+        const seriesSVG = `<svg viewBox="-5 0 110 40" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <defs>
+                <filter id="glow"><feGaussianBlur stdDeviation="1" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+            </defs>
+            <path d="M0 20 h10" filter="url(#glow)"/>
+            <circle cx="12" cy="20" r="3" stroke-width="1.2" />
+            <path d="M11 18 l2 4 M13 18 l-2 4" stroke-width="1" />
+            <path d="M15 20 h10" />
+            <!-- Resistor -->
+            <path d="M25 20 l2 -4 l4 8 l4 -8 l4 8 l4 -8 l2 4" />
+            <path d="M45 20 h5" />
+            <!-- Inductor -->
+            <path d="M50 20 c0 -6 4 -6 4 0 s4 6 4 0 s4 -6 4 0 s4 6 4 0" />
+            <path d="M66 20 h5" />
+            <!-- Capacitor -->
+            <path d="M71 12 v16 M76 12 v16" />
+            <path d="M76 20 h10" />
+            <circle cx="89" cy="20" r="3" stroke-width="1.2" />
+            <path d="M92 20 h8" />
+            
+            <text x="10" y="32" font-size="6" fill="currentColor" font-family="Outfit" font-weight="600">V_in</text>
+            <text x="32" y="10" font-size="6" fill="currentColor" font-family="Outfit" font-weight="600">R</text>
+            <text x="56" y="10" font-size="6" fill="currentColor" font-family="Outfit" font-weight="600">L</text>
+            <text x="71" y="10" font-size="6" fill="currentColor" font-family="Outfit" font-weight="600">C</text>
         </svg>`;
-        const parallelSVG = `<svg viewBox="0 0 100 60" fill="none" stroke="currentColor" stroke-width="1.5">
-            <path d="M5 30 h15 M20 10 v40 M20 10 h60 M20 50 h60 M40 10 v15 l3 5 l-3 5 v15 M60 10 v15 c3 0 3 5 0 5 s-3 5 0 5 c3 0 3 5 0 5 v10 M80 10 v18 h6 v-6 h-6 v6 M80 32 v18" />
-            <text x="5" y="25" font-size="5" fill="currentColor">I</text>
-            <text x="45" y="30" font-size="5" fill="currentColor">R</text>
-            <text x="65" y="30" font-size="5" fill="currentColor">L</text>
-            <text x="85" y="30" font-size="5" fill="currentColor">C</text>
+
+        const parallelSVG = `<svg viewBox="-5 -5 110 70" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M0 30 h10" />
+            <circle cx="13" cy="30" r="3" stroke-width="1.2" />
+            <path d="M13 28 v4 M11 30 h4" stroke-width="1" />
+            <path d="M16 30 h4" />
+            <path d="M20 10 v40 M20 10 h65 M20 50 h65" />
+            <!-- Resistor -->
+            <path d="M40 10 v8 l-4 2 l8 4 l-8 4 l8 4 l-8 4 l4 2 v8" />
+            <!-- Inductor -->
+            <path d="M62 10 v5 c-6 0 -6 4 0 4 s6 4 0 4 s-6 4 0 4 s6 4 0 4 v5" />
+            <!-- Capacitor -->
+            <path d="M85 10 v13 h-6 v0 h12 M79 27 h12 v0 h-6 v13" />
+            
+            <text x="5" y="42" font-size="7" fill="currentColor" font-family="Outfit" font-weight="600">I_in</text>
+            <text x="38" y="5" font-size="7" fill="currentColor" font-family="Outfit" font-weight="600">R</text>
+            <text x="60" y="5" font-size="7" fill="currentColor" font-family="Outfit" font-weight="600">L</text>
+            <text x="83" y="5" font-size="7" fill="currentColor" font-family="Outfit" font-weight="600">C</text>
         </svg>`;
         container.innerHTML = this.isSeries ? seriesSVG : parallelSVG;
     },
